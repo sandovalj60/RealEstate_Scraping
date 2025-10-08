@@ -13,7 +13,7 @@ def load_existing(csv_file):
         with open(csv_file, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                key = row["Link"]
+                key = row["Address"].strip().lower()
                 existing[key] = row
     except FileNotFoundError:
         pass
@@ -103,15 +103,16 @@ def scrape_suburb(driver, suburb, writer, existing, scrape_date, pages):
                 continue
 
             address, full_link, beds, baths, cars, area, prop_type, asking_price = result
+            address_key = address.strip().lower()
 
-            if full_link in existing:
-                first_date = existing[full_link]["Scraped Date"]
+            if address_key in existing:
+                first_date = existing[address_key]["Scraped Date"]
                 try:
                     days_on_market = (date.today() - datetime.strptime(first_date, "%Y-%m-%d").date()).days
                 except:
                     days_on_market = ""
             else:
-                days_on_market = ""
+                days_on_market = 0
 
             writer.writerow([
                 address, full_link, beds, baths, cars, area,
@@ -121,8 +122,9 @@ def scrape_suburb(driver, suburb, writer, existing, scrape_date, pages):
         print(f"✅ Page {page} scraped for '{suburb}'")
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrape multiple Perth suburbs into one CSV")
-    parser.add_argument("--suburbs", nargs="+", required=True, help="List of suburbs to scrape")
+    parser = argparse.ArgumentParser(description="Scrape Perth property listings")
+    parser.add_argument("--suburb", type=str, help="Single suburb to scrape")
+    parser.add_argument("--suburbs", nargs="+", help="Multiple suburbs to scrape")
     parser.add_argument("--pages", type=int, default=3, help="Number of pages per suburb")
     parser.add_argument("--output", type=str, default="all_perth.csv", help="Output CSV filename")
     args = parser.parse_args()
@@ -143,7 +145,13 @@ def main():
                 "Type", "Suburb", "Scraped Date", "Days on Market", "Asking Price"
             ])
 
-        for suburb in args.suburbs:
+        targets = []
+        if args.suburb:
+            targets.append(args.suburb)
+        if args.suburbs:
+            targets.extend(args.suburbs)
+
+        for suburb in targets:
             scrape_suburb(driver, suburb, writer, existing, scrape_date, args.pages)
 
     driver.quit()
